@@ -8,12 +8,16 @@ from typing import Any
 
 try:
     import pandas as pd
-except ModuleNotFoundError:  # pragma: no cover - local self-test fallback
+except Exception as _pd_import_err:  # pragma: no cover - catch all import failures
+    import sys
+    print(f"[WARN] pandas import failed: {_pd_import_err}", file=sys.stderr)
     pd = None
 
 try:
     import gradio as gr
-except ModuleNotFoundError:  # pragma: no cover - local self-test fallback
+except Exception as _gr_import_err:  # pragma: no cover - catch all import failures
+    import sys
+    print(f"[WARN] gradio import failed: {_gr_import_err}", file=sys.stderr)
     gr = None
 
 
@@ -516,9 +520,15 @@ def main() -> None:
         self_test()
         return
 
-    demo = build_demo()
     demo.launch()
 
+
+# Build demo at module level so HF Spaces SDK can discover it
+# (HF may import this module rather than run it as __main__)
+if gr is not None:
+    demo = build_demo()
+else:
+    demo = None
 
 if __name__ == "__main__":
     main()
