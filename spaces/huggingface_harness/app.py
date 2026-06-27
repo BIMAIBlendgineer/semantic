@@ -520,6 +520,8 @@ def main() -> None:
         self_test()
         return
 
+    if demo is None:
+        raise RuntimeError("gradio is required to launch the public harness demo")
     demo.launch()
 
 
