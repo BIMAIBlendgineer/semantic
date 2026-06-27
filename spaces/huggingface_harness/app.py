@@ -248,7 +248,14 @@ def search_public_cases(query: str, ifc_filter: str) -> tuple[Any, Any, list[dic
     frame = table_frame(items)
     labels = [record_label(item) for item in items]
     first = labels[0] if labels else None
-    summary = f"Loaded records: {len(RECORDS)} | Search results: {len(items)}"
+    if len(items) == 0:
+        summary = (
+            "Search results: 0 records found. "
+            "Suggestions: Try searching for general keywords like 'column', 'wall', 'beam', 'pump', "
+            "or reset the IFC class filter to 'All'."
+        )
+    else:
+        summary = f"Loaded records: {len(RECORDS)} | Search results: {len(items)}"
     selected_json = to_json(items[0]["record"]) if items else "{}"
     return (
         frame,
@@ -282,34 +289,71 @@ def show_selected_record(items: list[dict[str, Any]], choice: str | None) -> str
 def find_closest_case(text: str) -> tuple[str, str, str]:
     query = (text or "").strip()
     if not query:
-        item = build_table_items("", "All")[0]
-        summary = f"Closest public case: {item['sample_id']} (score={item['score']})"
-        return summary, to_json(item["record"]), PUBLIC_WARNING
-
-    terms = normalize_terms(query)
-    ranked = []
-    for index, record in enumerate(RECORDS):
-        score = score_record(record, terms)
-        ranked.append(
-            (
-                score,
-                index,
-                {
-                    "index": index,
-                    "record": record,
-                    "score": score,
-                    "sample_id": record.get("sample_id", f"sample-{index}"),
-                },
+        chosen = {
+            "index": 0,
+            "record": RECORDS[0],
+            "score": 0,
+            "sample_id": RECORDS[0].get("sample_id", "sample-0"),
+        }
+    else:
+        terms = normalize_terms(query)
+        ranked = []
+        for index, record in enumerate(RECORDS):
+            score = score_record(record, terms)
+            ranked.append(
+                (
+                    score,
+                    index,
+                    {
+                        "index": index,
+                        "record": record,
+                        "score": score,
+                        "sample_id": record.get("sample_id", f"sample-{index}"),
+                    },
+                )
             )
-        )
 
-    ranked.sort(key=lambda item: (-item[0], item[1]))
-    chosen = ranked[0][2]
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        chosen = ranked[0][2]
+
+    record = chosen["record"]
+    parsed = record.get("parsed_output") or {}
+    canonical = record.get("canonical_output") or {}
+    metadata = record.get("metadata") or {}
+    validation = record.get("validation") or {}
+    
+    suggested_ifc_class = canonical.get("ifc_class") or parsed.get("ifc_class") or "n/a"
+    semantic_intent = canonical.get("semantic_type") or parsed.get("semantic_type") or "n/a"
+    evidence_trace_raw = canonical.get("evidence_trace") or parsed.get("evidence_trace") or []
+    
+    loi = metadata.get("loi") or 0
+    lod = metadata.get("lod") or 0
+    
+    loi_note = f"LOI Level {loi}: Target IFC Property Sets: {canonical.get('required_psets') or parsed.get('required_psets') or []}."
+    lod_note = f"LOD Level {lod}: Target geometric bounds: {canonical.get('normalized_dimensions_m') or parsed.get('normalized_dimensions_m') or {}}."
+    
+    status = "SUCCESS" if (validation.get("ok") or record.get("ok")) else "FAILED_VALIDATION"
+    
+    illustrative_json = {
+        "input": query if query else "Default Replay Case",
+        "semantic_intent": semantic_intent,
+        "suggested_ifc_class": suggested_ifc_class,
+        "loi_note": loi_note,
+        "lod_note": lod_note,
+        "evidence_trace": evidence_trace_raw,
+        "limitations": [
+            "This is an illustrative output from the reduced public research harness.",
+            "No active LLM inference was executed.",
+            "3D geometry generation is not supported in the public validation tool."
+        ],
+        "status": status
+    }
+
     summary = (
-        f"Closest public case: {chosen['sample_id']} "
-        f"(score={chosen['score']}, index={chosen['index']})"
+        f"Closest matched public case: {chosen['sample_id']} "
+        f"(similarity score={chosen['score']}, index={chosen['index']})"
     )
-    return summary, to_json(chosen["record"]), PUBLIC_WARNING
+    return summary, to_json(illustrative_json), PUBLIC_WARNING
 
 
 def validate_json_input(text: str) -> tuple[str, str, str]:
@@ -403,19 +447,25 @@ def build_demo() -> gr.Blocks:
                 ifc_options.append(value)
     ifc_options = ["All"] + sorted(value for value in ifc_options if value != "All")
 
-    with gr.Blocks(title="Semantic XAIBIM Public Harness") as demo:
+    with gr.Blocks(title="Semantic AI for BIM/IFC: Public Research Harness") as demo:
         gr.Markdown(
-            "# Semantic XAIBIM Public Harness\n\n"
+            "# Semantic AI for BIM/IFC: Public Research Harness\n\n"
             f"Loaded public records: **{len(RECORDS)}**\n\n"
-            f"{PUBLIC_WARNING}"
+            f"{PUBLIC_WARNING}\n\n"
+            "This application provides an interactive surface to search, try, and validate natural language semantic parsing outputs against structured BIM/IFC research contracts."
         )
 
         search_state = gr.State(initial_search_state())
 
         with gr.Tab("Search public cases"):
+            gr.Markdown(
+                "### Search Sanitised Public Cases\n"
+                "Query the 20 public research records loaded in the harness database. "
+                "You can search by keywords (e.g., **column**, **wall**, **beam**, **pump**) or look up specific sample IDs."
+            )
             query = gr.Textbox(
                 label="Search text",
-                placeholder="Search public cases by semantic words, sample id, or evidence labels",
+                placeholder="e.g. column, wall, beam, pump, or a sample ID",
             )
             ifc_filter = gr.Dropdown(
                 choices=ifc_options,
@@ -454,14 +504,42 @@ def build_demo() -> gr.Blocks:
             )
 
         with gr.Tab("Try semantic input"):
+            gr.Markdown(
+                "### Try Semantic Prompt Parsing\n"
+                "⚠️ **Important Disclaimer**: This is an illustrative semantic parsing demo. It matches your prompt against the public sample dataset. "
+                "It **does not generate 3D IFC model files/geometry** (LOD) and does not call a live model server. It returns the semantic mappings and trace information (LOI).\n\n"
+                "To get started, select one of the predefined examples below or enter your own custom text."
+            )
+            
+            examples_dropdown = gr.Dropdown(
+                choices=[
+                    "I need a reinforced concrete column with IFC classification and LOI information.",
+                    "Classify a partition wall and suggest IFC semantic information.",
+                    "Validate whether a window request can map to Pset_WindowCommon.",
+                    "Explain what information is missing to classify this BIM element."
+                ],
+                label="Predefined Examples (Click to load)",
+                value=None
+            )
+
             semantic_input = gr.Textbox(
                 label="Semantic input",
                 lines=6,
                 placeholder="Write a public semantic request and match it against the reduced sample.",
             )
+            
+            def load_example(choice: str) -> str:
+                return choice or ""
+            
+            examples_dropdown.change(
+                fn=load_example,
+                inputs=examples_dropdown,
+                outputs=semantic_input
+            )
+
             semantic_button = gr.Button("Match public case")
             semantic_summary = gr.Textbox(label="Match summary", interactive=False)
-            semantic_json = gr.Code(label="Matched record JSON", language="json")
+            semantic_json = gr.Code(label="Matched record JSON (Illustrative Output)", language="json")
             semantic_warning = gr.Textbox(label="Public demo warning", interactive=False)
 
             semantic_button.click(
@@ -476,9 +554,32 @@ def build_demo() -> gr.Blocks:
             )
 
         with gr.Tab("Validate JSON"):
+            gr.Markdown(
+                "### Validate Research JSON Payload\n"
+                "This tool checks whether an AI prediction matches the required structured research contract. "
+                "The contract enforces that the JSON object must contain at least four mandatory keys: "
+                "`status`, `canonical_output`, `validation`, and `metadata`."
+            )
+            
+            minimal_valid_json = to_json({
+                "status": "PASS",
+                "canonical_output": {
+                    "ifc_class": "IfcColumn",
+                    "semantic_type": "semantic_enrichment"
+                },
+                "validation": {
+                    "ok": True
+                },
+                "metadata": {
+                    "source_split": "train",
+                    "risk_level": "low"
+                }
+            })
+
             json_input = gr.Textbox(
                 label="JSON input",
                 lines=10,
+                value=minimal_valid_json,
                 placeholder="Paste a JSON object with status, canonical_output, validation and metadata.",
             )
             json_button = gr.Button("Validate")
@@ -498,6 +599,12 @@ def build_demo() -> gr.Blocks:
             )
 
         with gr.Tab("Run public harness"):
+            gr.Markdown(
+                "### Run Reproducibility & Schema Validation\n"
+                "This action runs the internal validation tests over all 20 sanitized public records "
+                "stored in `sample20_public_predictions.jsonl`. It confirms schema integrity, record length, "
+                "and verifies that every record is fully compliant with the core research contract."
+            )
             harness_button = gr.Button("Run validation")
             harness_result = gr.Textbox(label="Harness result", interactive=False)
             harness_notes = gr.Textbox(label="Notes", interactive=False)
