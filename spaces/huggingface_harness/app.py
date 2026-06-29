@@ -207,7 +207,7 @@ def semantic_bim_preview(text: str) -> tuple[str, list[list[str]], str, str, str
         },
         "lod": {
             "meaning": "Level of Detail / Development",
-            "status": "Conceptual 3D preview only; no certified geometry generated"
+            "status": "Conceptual 3D preview only; no certified IFC geometry generated"
         },
         "evidence_trace": evidence,
         "limitations": [
@@ -221,7 +221,7 @@ def semantic_bim_preview(text: str) -> tuple[str, list[list[str]], str, str, str
 
     json_str = to_json(contract_json)
     
-    lod_note = "LOD Status: Conceptual 3D preview only; no certified geometry generated."
+    lod_note = "LOD Status: Conceptual 3D preview only; no certified IFC geometry generated."
     evidence_str = "\n".join([f"- {ev}" for ev in evidence])
     limitations_str = "\n".join([
         "- No certified BIM decision",
@@ -427,8 +427,7 @@ def search_public_cases(query: str, ifc_filter: str) -> tuple[Any, Any, list[dic
     if len(items) == 0:
         summary = (
             "Search results: 0 records found. "
-            "Suggestions: Try searching for general keywords like 'column', 'wall', 'beam', 'pump', "
-            "or reset the IFC class filter to 'All'."
+            "Suggestions: column, wall, beam, slab, window, IfcColumn, Pset_WindowCommon, PREVIEW."
         )
     else:
         summary = f"Loaded records: {len(RECORDS)} | Search results: {len(items)}"
@@ -667,20 +666,21 @@ def build_demo() -> gr.Blocks:
                 ifc_options.append(value)
     ifc_options = ["All"] + sorted(value for value in ifc_options if value != "All")
 
-    with gr.Blocks(title="Semantic AI for BIM/IFC: Public Research Harness") as demo:
+    with gr.Blocks(title="Semantic AI for BIM/IFC: Guided Research Demo") as demo:
         gr.Markdown(
-            "# Semantic AI for BIM/IFC: Public Research Harness\n\n"
+            "# Semantic AI for BIM/IFC: Guided Research Demo\n\n"
             f"Loaded public records: **{len(RECORDS)}**\n\n"
             f"{PUBLIC_WARNING}\n\n"
-            "This public demo does not generate full IFC geometry or certified BIM deliverables. "
-            "It demonstrates semantic interpretation, structured output, validation and replay over a reduced sanitized sample."
+            "**Subtitle**: Natural-language civil engineering request → semantic BIM/IFC preview → LOI table → conceptual LOD preview → auditable JSON.\n\n"
+            "**Disclaimer**: This public research demo does not generate certified IFC geometry or professional BIM deliverables. "
+            "It provides a conceptual 3D preview, structured semantic metadata, LOI explanation, validation and replay over a reduced sanitized sample."
         )
 
         search_state = gr.State(initial_search_state())
 
-        with gr.Tab("Start here — Natural language to BIM/IFC semantic preview"):
+        with gr.Tab("Start here — Guided BIM/IFC preview"):
             gr.Markdown(
-                "### Start here — Natural language to BIM/IFC semantic preview\n"
+                "### Start here — Guided BIM/IFC preview\n"
                 "- **What this does**: Translates your plain text construction requests into structured BIM/IFC metadata and generates an illustrative 3D shape.\n"
                 "- **What to try**: Type a request like *'I need a reinforced concrete column'* or click one of the examples below.\n"
                 "- **What result means**: The JSON represents the auditable metadata contract (LOI), and the 3D canvas displays a conceptual geometry preview (LOD)."
@@ -707,6 +707,7 @@ def build_demo() -> gr.Blocks:
                     )
                 
                 with gr.Column(scale=1):
+                    gr.Markdown("This is a conceptual LOD preview, not a certified IFC model.")
                     preview_3d = gr.Model3D(
                         label="3D Element Preview (LOD)",
                         clear_color=[0.9, 0.9, 0.9, 1.0]
@@ -725,10 +726,10 @@ def build_demo() -> gr.Blocks:
                 with gr.Column(scale=1):
                     evidence_trace_box = gr.Textbox(label="Evidence Trace", lines=4, interactive=False)
                     limitations_box = gr.Textbox(label="Limitations & Warnings", lines=4, interactive=False)
-
+ 
             with gr.Row():
                 json_output = gr.Code(label="Contract JSON Output", language="json")
-
+ 
             generate_button.click(
                 fn=semantic_bim_preview,
                 inputs=semantic_input_first,
@@ -789,10 +790,10 @@ def build_demo() -> gr.Blocks:
                 outputs=[result_table, result_choice, search_state, search_summary, selected_json],
             )
 
-        with gr.Tab("Try semantic input"):
+        with gr.Tab("Find similar public sample"):
             gr.Markdown(
-                "### Try Semantic Prompt Parsing\n"
-                "- **What this does**: Permite escribir una petición técnica. La demo pública no genera IFC nuevo; devuelve una interpretación semántica ilustrativa basada en matching y estructura JSON.\n"
+                "### Find similar public sample\n"
+                "- **What this does**: This tab does not generate a new BIM/IFC semantic preview. It searches the reduced 20-record public sample and returns the closest existing public record.\n"
                 "- **What to try**: Enter a query or select an example to see what metadata would be mapped in this harness.\n"
                 "- **What result means**: Shows the closest matching record in JSON format for review."
             )
@@ -845,7 +846,7 @@ def build_demo() -> gr.Blocks:
                 "### Validate Research JSON Payload\n"
                 "- **What this does**: Permite comprobar si una salida cumple el contrato mínimo.\n"
                 "- **What to try**: Edit the pre-populated JSON payload and click 'Validate' to check for compliance.\n"
-                "- **What result means**: Returns PASS if all required keys (`status`, `canonical_output`, `validation`, `metadata`) are present, otherwise lists errors."
+                "- **What result means**: This validates the minimum research contract, not a BIM certification."
             )
             
             minimal_valid_json = to_json({
@@ -921,7 +922,7 @@ def main() -> None:
 
 # Build demo at module level so HF Spaces SDK can discover it
 # (HF may import this module rather than run it as __main__)
-if gr is not None:
+if gr is not None and hasattr(gr, "Blocks"):
     demo = build_demo()
 else:
     demo = None
