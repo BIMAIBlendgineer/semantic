@@ -20,7 +20,7 @@ Un ingeniero civil normalmente piensa en elementos físicos: pilares, vigas, mur
   * **Clase IFC candidata**: `IfcColumn`.
   * **Material candidato**: Reinforced concrete (hormigón armado).
   * **LOI (Level of Information)**: Información alfanumérica requerida para el componente.
-  * **LOD (Level of Development)**: Representación geométrica (no generada todavía en la demo pública).
+  * **LOD (Level of Development)**: Representación geométrica (LOD: conceptual preview only; no certified IFC geometry is generated).
   * **Salida**: JSON estructurado que actúa como contrato técnico.
   * **Validación**: Comprobación automatizada de campos mínimos requeridos en el esquema.
   * **Explicación**: Evidencias y trazas textuales de por qué se realizó la interpretación anterior.
@@ -49,7 +49,7 @@ It allows reviewers to:
 4. Run validation scripts to prove reproducibility.
 
 ### What it does not do yet
-- **No 3D Geometry**: It does not draw or output 3D geometry files.
+- **Conceptual 3D preview only**: the demo provides OBJ-based conceptual previews for illustration, but it does not generate certified IFC geometry or full BIM authoring deliverables.
 - **No Live Inference**: It does not host active large language models. The matching is resolved deterministically against the sanitised database.
 
 ---
@@ -101,7 +101,7 @@ flowchart TB
     subgraph Today[Public research harness today]
         A1[20 sanitized records]
         A2[Search public cases]
-        A3[Try semantic input by matching]
+        A3[Find similar public sample]
         A4[Validate JSON contract]
         A5[Run replay harness]
     end
@@ -145,7 +145,7 @@ flowchart LR
 
 This repository includes a CPCA A1 methodological note describing how the public semantic BIM/IFC sample, validation harness, benchmark plan, LoRA/QLoRA adaptation strategy, quantization/QAT discussion and XAI methodology connect as a scientific workflow.
 
-Read it here: [docs/cpca_a1_methodology_note.md](file:///C:/0%20Work/0%20XAIBIM/semantic/docs/cpca_a1_methodology_note.md)
+Read it here: [docs/cpca_a1_methodology_note.md](docs/cpca_a1_methodology_note.md)
 
 ---
 
